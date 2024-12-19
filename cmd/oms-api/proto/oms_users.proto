@@ -10,15 +10,17 @@ message User {
     int32 id = 1;
     string name = 2;
     string email = 3;
-    string created_at = 4;
-    string updated_at = 5;
-    string deleted_at = 6; // This can be a timestamp or a null field
+    string password = 4; // This can be a hashed password or a null field
+    string created_at = 5;
+    string updated_at = 6;
+    string deleted_at = 7; // This can be a timestamp or a null field
 }
 
 // CreateUserRequest message is used to create a new user
 message CreateUserRequest {
     string name = 1;
     string email = 2;
+    string password = 3;
 }
 
 // UpdateUserRequest message is used to update an existing user
@@ -26,6 +28,7 @@ message UpdateUserRequest {
     int32 id = 1;
     string name = 2;
     string email = 3;
+    string password = 4; // This can be a hashed password or a null field
 }
 
 // GetUserRequest message is used to request a user by ID
@@ -84,8 +87,18 @@ message UserOrderResponse {
 }
 
 
+message LoginRequest {
+    string email = 1;
+    string password = 2;
+}
+
+message LoginResponse {
+    string token = 1;
+}
+
 // The UserService service allows CRUD operations on users
 service UserService {
+    rpc Login(LoginRequest) returns (LoginResponse);
     rpc CreateUser (CreateUserRequest) returns (User);
     rpc GetUserById (GetUserRequest) returns (User);
     rpc GetAllUsers (EmptyRequestUser) returns (GetAllUsersResponse);

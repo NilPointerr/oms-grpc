@@ -12,6 +12,7 @@ type User struct {
 	ID        int32          `json:"id"`
 	Name      string         `json:"name"`
 	Email     string         `json:"email"`
+	Password  string         `json:"password"` // This can be a hashed password or a null field
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `json:"deleted_at"`
@@ -30,6 +31,7 @@ func (u *User) ToPb() *pb.User {
 		Id:        int32(u.ID),
 		Name:      u.Name,
 		Email:     u.Email,
+		Password:  u.Password,
 		CreatedAt: u.CreatedAt.String(),
 		UpdatedAt: u.UpdatedAt.String(),
 		DeletedAt: u.DeletedAt.Time.String(),

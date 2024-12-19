@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/keyurKalariya/OMS/cmd/oms-api/models"
 	pb "github.com/keyurKalariya/OMS/cmd/oms-api/protobuf"
 	"google.golang.org/grpc/codes"
@@ -17,38 +20,65 @@ type OmsUserServiceServer struct {
 	DB *gorm.DB
 }
 
-// var jwtSecret = []byte("your-secret-key")
+var jwtSecret = []byte("uIqReXVOaBUb8hUCwMr4")
 
-// // Login generates a JWT token for authenticated users
-// func (s *OmsUserServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-// 	// Validate user credentials (replace with real validation)
-// 	var user models.User
-// 	err := s.DB.Where("email = ? AND password = ?", req.Email, req.Password).First(&user).Error
-// 	if err != nil {
-// 		return nil, err // Invalid credentials
-// 	}
+// Login generates a JWT token for authenticated users
+func (s *OmsUserServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	log.Println("login------------------------")
 
-// 	// Create the JWT claims
-// 	claims := jwt.MapClaims{
-// 		"user_id": user.ID,
-// 		"exp":     time.Now().Add(time.Hour * 1).Unix(), // Token expires in 1 hour
-// 	}
+	// Validate user credentials (replace with real validation)
+	var user models.User
+	err := s.DB.Where("email = ? AND password = ?", req.Email, req.Password).First(&user).Error
+	if err != nil {
+		return nil, fmt.Errorf("invalid credentials: %v", err) // Invalid credentials
+	}
 
-// 	// Generate the token
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-// 	signedToken, err := token.SignedString(jwtSecret)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	// Create the JWT claims
+	claims := jwt.MapClaims{
+		"user_id": user.ID,
+		"exp":     time.Now().Add(time.Hour * 1).Unix(), // Token expires in 1 hour
+	}
 
-// 	return &pb.LoginResponse{Token: signedToken}, nil
-// }
+	log.Println("claims--------------------------------", claims)
+
+	// Generate the token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString(jwtSecret)
+	log.Println("Token:-", signedToken)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign the token: %v", err)
+	}
+
+	// Validate the token right after creation (optional)
+	tokenParsed, err := jwt.Parse(signedToken, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the token's signing method is correct
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method %v", token.Header["alg"])
+		}
+		return jwtSecret, nil // Return the secret for verification
+	})
+
+	// Check for token validity
+	if err != nil {
+		return nil, fmt.Errorf("invalid token: %v", err)
+	}
+
+	if claims, ok := tokenParsed.Claims.(jwt.MapClaims); ok && tokenParsed.Valid {
+		log.Println("Token is valid. Claims:", claims)
+	} else {
+		return nil, fmt.Errorf("invalid token claims or token is not valid")
+	}
+
+	// Return the token in the response
+	return &pb.LoginResponse{Token: signedToken}, nil
+}
 
 func (s *OmsUserServiceServer) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
 	// Initialize a new user from the request data
 	newUser := models.User{
-		Name:  req.GetName(),
-		Email: req.GetEmail(),
+		Name:     req.GetName(),
+		Email:    req.GetEmail(),
+		Password: req.GetPassword(),
 	}
 
 	// Insert the new user into the database using GORM
@@ -89,6 +119,7 @@ func (s *OmsUserServiceServer) GetAllUsers(ctx context.Context, req *pb.EmptyReq
 			Id:        int32(user.ID),
 			Name:      user.Name,
 			Email:     user.Email,
+			Password:  user.Password,
 			CreatedAt: user.CreatedAt.String(),
 			UpdatedAt: user.UpdatedAt.String(),
 		})
