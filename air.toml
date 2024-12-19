@@ -1,27 +1,28 @@
-# Config file for Air (https://github.com/air-verse/air) in TOML format
+# air.toml for hot reloading Go project
 
 # Working directory
 root = "."
+
+# Temporary directory to store compiled binaries
 tmp_dir = "tmp"
 
+# Commands before building (if necessary)
 [build]
-# Array of commands to run before each build (can be empty or customized)
-pre_cmd = ["echo 'Starting build process...' > pre_cmd.txt"]
+pre_cmd = ["echo 'Starting build process...'"]
 
-# Command to build your Go project
-cmd = "go build -o ./tmp/main /home/dev53/nilesh/oms-grpc/cmd/oms-api/main2.go"
+# Go build command to compile the Go project
+cmd = "go build -o ./tmp/main ./cmd/oms-api/main.go"  # Ensure it builds from main2.go
 
-# Array of commands to run after the build process
-post_cmd = ["echo 'Build completed' > post_cmd.txt"]
+# Commands after build (if needed)
+post_cmd = ["echo 'Build completed'"]
 
-# Binary output path
+# Path to the binary output
 bin = "tmp/main"
 
-# Full command to run after building
-# You can set environment variables here if needed
+# Full command to run the binary after building
 full_bin = "./tmp/main"
 
-# Arguments to pass to your Go binary (if needed)
+# Arguments to pass to your binary (if any)
 args_bin = []
 
 # Extensions to watch for changes
@@ -30,70 +31,25 @@ include_ext = ["go", "tpl", "tmpl", "html"]
 # Directories to exclude from being watched
 exclude_dir = ["assets", "tmp", "vendor", "frontend/node_modules"]
 
-# Specify directories to include (if any)
+# Specify directories to include (optional)
 include_dir = []
 
-# Specify individual files to include (if any)
+# Specify individual files to include (optional)
 include_file = []
 
 # Exclude test files from being watched
 exclude_regex = ["_test\\.go"]
 
-# Exclude unchanged files
-exclude_unchanged = true
-
-# Follow symlinks for directories
-follow_symlink = true
-
-# Path to the log file
-log = "air.log"
-
-# Polling options (use fsnotify by default)
-poll = false
-poll_interval = 500  # milliseconds
-
-# Prevent triggering build on too frequent file changes
-delay = 0  # milliseconds
-
-# Stop running the old binary if there are build errors
+# Stop if there are build errors
 stop_on_error = true
 
-# Automatically rerun binary (you can turn this off if needed)
+# Automatically rerun the binary after each build
 rerun = true
 
-# Delay after each execution
+# Delay after each execution (in ms)
 rerun_delay = 500
 
+# Log settings
 [log]
-# Show log time
 time = false
-
-# Show all logs (main, watcher, build, and runner logs)
-main_only = false
-
-# Enable or disable logging
 silent = false
-
-[color]
-# Customize the colors of logs in the terminal
-main = "magenta"
-watcher = "cyan"
-build = "yellow"
-runner = "green"
-
-[misc]
-# Delete the tmp directory on exit
-clean_on_exit = true
-
-[screen]
-# Clear the terminal screen on rebuild
-clear_on_rebuild = true
-
-# Keep the scrollback history visible
-keep_scroll = true
-
-[proxy]
-# Enable live-reloading through a proxy server on the browser
-enabled = true
-proxy_port = 8090
-app_port = 8080

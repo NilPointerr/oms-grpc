@@ -172,3 +172,7 @@ This will open a web-based UI for interacting with the gRPC server.
 
 For more details, visit the official [grpcui GitHub repository](https://github.com/fullstorydev/grpcui).
 
+
+
+
+air -c air.toml
