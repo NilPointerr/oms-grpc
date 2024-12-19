@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+option go_package ="./protobuf";
+
+
+// Order message represents the structure of an order.
+message Order {
+    int32 user_id = 2;
+    repeated OrderItem items = 6; // List of items in the order
+    string created_at = 7;
+    string updated_at = 8;
+    string deleted_at = 9; // Soft delete timestamp
+}
+
+// OrderItem message represents an item in an order.
+message OrderItem {
+    int32 item_id = 3;
+    int32 quantity = 4;
+}
+
+// CreateOrderRequest is used to create an order.
+message CreateOrderRequest {
+    Order order = 1;
+}
+
+message UpdateOrderRequest {
+    int32 order_id = 1; // Order ID
+    repeated OrderItem items = 4; // List of items in the order
+}
+// UpdateOrderRequest is used to update an existing order.
+
+// DeleteOrderRequest is used to delete an order.
+message DeleteOrderRequest {
+    int32 order_id = 1; // Order ID
+}
+
+// GetOrderRequest is used to get a specific order.
+message GetOrderRequest {
+    int32 order_id = 1; // Order ID
+}
+
+// GetAllOrdersRequest is used to get all orders.
+message GetAllOrdersRequest {}
+
+    // OrderResponse is the response for getting order(s).
+message OrderResponse {
+    OrderResponse1 orderResponse = 1;
+}
+
+// OrdersResponse is the response containing multiple orders.
+message OrdersResponse {
+    repeated Order orders = 1;
+}
+
+message DeleteOrderResponse {
+    string message = 1; // Success or error message
+}
+
+
+// Order message represents the structure of an order.
+message OrderResponse1 {
+    int32 id = 1;
+    int32 user_id = 2;
+    double total_price = 3;
+    string status = 4;
+    double final_price = 5; // Total price after applying discounts
+    repeated OrderItemForResponse items = 6; // List of items in the order
+}
+
+message OrderItemForResponse {
+    int32 item_id = 3;
+    int32 quantity = 4;
+    double price = 5;
+}
+
+message AllOrderReponse{
+    repeated OrderResponse1 orders = 1;
+}
+
+// Request message for updating the order status
+message UpdateOrderStatusRequest {
+    int32 order_id = 1; // The ID of the order to be updated
+}
+
+// Response message for updating the order status
+message UpdateOrderStatusResponse {
+    string message = 1; // Success or error message
+    string current_status = 2; // The updated status of the order
+}
+
+// OrderService defines the CRUD operations for orders.
+service OrderService {
+    rpc CreateOrder (CreateOrderRequest) returns (OrderResponse);
+    rpc UpdateOrderById (UpdateOrderRequest) returns (OrderResponse1);
+    rpc DeleteOrderById (DeleteOrderRequest) returns (DeleteOrderResponse);
+    rpc GetOrderById (GetOrderRequest) returns (OrderResponse);
+    rpc GetAllOrders (GetAllOrdersRequest) returns (AllOrderReponse);
+    rpc UpdateOrderStatusByOrderId (UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
+
+}

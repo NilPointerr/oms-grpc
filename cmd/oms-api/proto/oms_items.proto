@@ -1,0 +1,53 @@
+syntax= "proto3";
+option go_package ="./protobuf";
+
+
+message ItemRequest{
+    string name=1;
+    string description=2;
+    int32 price=3;
+}
+
+message ItemResponse{
+    int32 id=1;
+    string name=2;
+    string description=3;
+    int32 price=4;
+}
+
+message GetItemRequest{
+    int32 id=1;
+}
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+
+message GetAllItemResponse{
+    repeated ItemResponse Items =1;
+}
+
+message UpdateItemRequest{
+    int32 id=1;
+    string name=2;
+    string description=3;
+    int32 price=4;
+}
+
+message DeleteItemRequest{
+    int32 item_id=1;
+}
+
+message DeleteItemResponse {
+    string message = 1; // Success or error message
+}
+
+service omsItemService{
+    rpc CreateItem(ItemRequest) returns (ItemResponse);
+    rpc GetItemById (GetItemRequest) returns (ItemResponse);
+    rpc GetAllItems(EmptyRequest) returns (GetAllItemResponse);
+    rpc UpdateItemById(UpdateItemRequest) returns (ItemResponse);
+    rpc DeleteItemById(DeleteItemRequest) returns (DeleteItemResponse);
+}
+
+

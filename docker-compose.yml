@@ -1,0 +1,123 @@
+# version: '3.8'
+
+# services:
+#   oms-api:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: oms-api-grpc
+#     ports:
+#       - "8080:8080"
+#     networks:
+#       - my-network
+#     environment:
+#       - DB_HOST=postgres-container-40
+#       - DB_PORT=5432
+#       - DB_USER=root
+#       - DB_PASSWORD=root
+#       - DB_NAME=oms
+#     depends_on:
+#       postgres-service:
+#           condition: service_started
+#     command: ["sh", "-c", "/wait-for-it.sh postgres-container-40:5432 --timeout=60 -- echo 'Postgres is up!' && ./main"] # Add your actual application start command here
+
+
+
+#   # PostgreSQL Database Service
+#   postgres-service:
+#     image: postgres:latest
+#     container_name: postgres-container-40
+#     environment:
+#       - POSTGRES_USER=root
+#       - POSTGRES_PASSWORD=root
+#       - POSTGRES_DB=oms
+#     healthcheck:
+#       test: ["CMD", "pg_isready", "-U", "root", "-d", "oms", "-h", "postgres-container-40", "-p", "5432"]
+#       interval: 10s
+#       retries: 5
+#       start_period: 30s
+#       timeout: 5s
+#     ports:
+#       - "5432:5432"
+#     networks:
+#       - my-network
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+
+# # Networks and volumes
+# networks:
+#   my-network:
+#     # driver: bridge
+
+# volumes:
+#   postgres_data:
+#     driver: local
+
+
+
+version: '3.8'
+
+services:
+  oms-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oms-api-grpc
+    ports:
+      - "8080:8080"    # Expose the gRPC server
+      - "44562:44562"  # Expose the gRPC Web UI
+    networks:
+      - my-network
+    environment:
+      - DB_HOST=postgres-container-40
+      - DB_PORT=5432
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=oms
+    depends_on:
+      postgres-service:
+        condition: service_started
+    command: ["sh", "-c", "/wait-for-it.sh postgres-container-40:5432 --timeout=60 -- echo 'Postgres is up!' && ./main"] # Add your actual application start command here
+
+  # PostgreSQL Database Service
+  postgres-service:
+    image: postgres:latest
+    container_name: postgres-container-40
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=oms
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "root", "-d", "oms", "-h", "postgres-container-40", "-p", "5432"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    ports:
+      - "5432:5432"
+    networks:
+      - my-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  grpcui:
+    image: fullstorydev/grpcui:v1.4.2  # Use the Docker Hub version
+    container_name: grpcui
+    ports:
+      - "44562:44562"
+    networks:
+      - my-network
+    environment:
+      - GRPC_SERVER=oms-api-grpc:8080
+    depends_on:
+      - oms-api
+    command: ["grpcui", "-plaintext", "-port", "44562", "oms-api-grpc:8080"]
+
+# Networks and volumes
+networks:
+  my-network:
+    # driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
