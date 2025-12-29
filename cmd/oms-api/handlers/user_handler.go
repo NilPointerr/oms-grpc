@@ -79,6 +79,11 @@ func (s *OmsUserServiceServer) Login(ctx context.Context, req *pb.LoginRequest) 
 		return nil, status.Errorf(codes.Internal, "failed to fetch user: %v", err)
 	}
 
+	// Check if user has a password set (for existing users without passwords)
+	if user.Password == "" {
+		return nil, status.Errorf(codes.FailedPrecondition, "user account requires password reset. Please contact administrator or create a new account.")
+	}
+
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.GetPassword())); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid email or password")
