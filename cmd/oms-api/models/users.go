@@ -11,7 +11,8 @@ import (
 type User struct {
 	ID        int32          `json:"id"`
 	Name      string         `json:"name"`
-	Email     string         `json:"email"`
+	Email     string         `json:"email" gorm:"uniqueIndex"`
+	Password  string         `json:"-" gorm:"not null"` // Password field, excluded from JSON
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `json:"deleted_at"`

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/keyurKalariya/OMS/cmd/oms-api/handlers"
+	"github.com/keyurKalariya/OMS/cmd/oms-api/middleware"
 	"github.com/keyurKalariya/OMS/cmd/oms-api/models"
 	pb "github.com/keyurKalariya/OMS/cmd/oms-api/protobuf"
 	"google.golang.org/grpc"
@@ -100,8 +101,10 @@ func main() {
 		log.Fatalf("Failed to create listener: %s", err)
 	}
 
-	// Initialize gRPC server
-	grpcServer := grpc.NewServer()
+	// Initialize gRPC server with authentication interceptor
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.AuthInterceptor),
+	)
 
 	// Enable gRPC reflection
 	reflection.Register(grpcServer)

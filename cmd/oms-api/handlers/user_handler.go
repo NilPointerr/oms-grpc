@@ -6,6 +6,8 @@ import (
 
 	"github.com/keyurKalariya/OMS/cmd/oms-api/models"
 	pb "github.com/keyurKalariya/OMS/cmd/oms-api/protobuf"
+	"github.com/keyurKalariya/OMS/cmd/oms-api/utils"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -17,38 +19,107 @@ type OmsUserServiceServer struct {
 	DB *gorm.DB
 }
 
-// var jwtSecret = []byte("your-secret-key")
+// Register creates a new user account and returns a JWT token
+func (s *OmsUserServiceServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	// Validate input
+	if req.GetName() == "" || req.GetEmail() == "" || req.GetPassword() == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name, email, and password are required")
+	}
 
-// // Login generates a JWT token for authenticated users
-// func (s *OmsUserServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-// 	// Validate user credentials (replace with real validation)
-// 	var user models.User
-// 	err := s.DB.Where("email = ? AND password = ?", req.Email, req.Password).First(&user).Error
-// 	if err != nil {
-// 		return nil, err // Invalid credentials
-// 	}
+	// Check if user already exists
+	var existingUser models.User
+	if err := s.DB.Where("email = ?", req.GetEmail()).First(&existingUser).Error; err == nil {
+		return nil, status.Errorf(codes.AlreadyExists, "user with this email already exists")
+	}
 
-// 	// Create the JWT claims
-// 	claims := jwt.MapClaims{
-// 		"user_id": user.ID,
-// 		"exp":     time.Now().Add(time.Hour * 1).Unix(), // Token expires in 1 hour
-// 	}
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to hash password: %v", err)
+	}
 
-// 	// Generate the token
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-// 	signedToken, err := token.SignedString(jwtSecret)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	// Create new user
+	newUser := models.User{
+		Name:     req.GetName(),
+		Email:    req.GetEmail(),
+		Password: string(hashedPassword),
+	}
 
-// 	return &pb.LoginResponse{Token: signedToken}, nil
-// }
+	// Insert the new user into the database
+	if err := s.DB.Create(&newUser).Error; err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
+	}
+
+	// Generate JWT token
+	token, err := utils.GenerateToken(newUser.ID, newUser.Email)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate token: %v", err)
+	}
+
+	// Return response with token and user info
+	return &pb.RegisterResponse{
+		Token: token,
+		User:  newUser.ToPb(),
+	}, nil
+}
+
+// Login authenticates a user and returns a JWT token
+func (s *OmsUserServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	// Validate input
+	if req.GetEmail() == "" || req.GetPassword() == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "email and password are required")
+	}
+
+	// Find user by email
+	var user models.User
+	if err := s.DB.Where("email = ? AND deleted_at IS NULL", req.GetEmail()).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, status.Errorf(codes.Unauthenticated, "invalid email or password")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to fetch user: %v", err)
+	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.GetPassword())); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid email or password")
+	}
+
+	// Generate JWT token
+	token, err := utils.GenerateToken(user.ID, user.Email)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate token: %v", err)
+	}
+
+	// Return response with token and user info
+	return &pb.LoginResponse{
+		Token: token,
+		User:  user.ToPb(),
+	}, nil
+}
 
 func (s *OmsUserServiceServer) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
+	// Validate input
+	if req.GetName() == "" || req.GetEmail() == "" || req.GetPassword() == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name, email, and password are required")
+	}
+
+	// Check if user already exists
+	var existingUser models.User
+	if err := s.DB.Where("email = ?", req.GetEmail()).First(&existingUser).Error; err == nil {
+		return nil, status.Errorf(codes.AlreadyExists, "user with this email already exists")
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to hash password: %v", err)
+	}
+
 	// Initialize a new user from the request data
 	newUser := models.User{
-		Name:  req.GetName(),
-		Email: req.GetEmail(),
+		Name:     req.GetName(),
+		Email:    req.GetEmail(),
+		Password: string(hashedPassword),
 	}
 
 	// Insert the new user into the database using GORM
