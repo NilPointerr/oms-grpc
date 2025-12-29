@@ -1,53 +1,12 @@
-# # Use the official Go image as a base image
-# FROM golang:latest
+# Multi-stage build for smaller final image
+# Stage 1: Build stage
+FROM golang:1.22.2-alpine AS builder
 
-# # Set the working directory inside the container
-# WORKDIR /app
-
-# # Copy wait-for-it.sh
-# COPY wait-for-it.sh /wait-for-it.sh
-# RUN chmod +x /wait-for-it.sh
-
-# # RUN go install github.com/cosmtrek/air@latest
-
-# # Copy go.mod and go.sum files
-# COPY go.mod go.sum ./
-
-# # Download dependencies
-# RUN go mod download
-
-# # Install grpcui inside the Docker container
-# # Install grpcui inside the Docker container
-# # Install grpcui using Go
-# RUN GO111MODULE=on go install github.com/fullstorydev/grpcui/cmd/grpcui@latest
-
-
-
-# # Copy the entire project
-# COPY . .
-
-# # Build the Go application
-# RUN go build -o main ./cmd/oms-api/main.go
-
-# # Expose port 8080 (or any other port your app runs on)
-# EXPOSE 8080
-
-# # Command to run the application
-# # CMD ["./main"]
-# CMD ["/wait-for-it.sh", "postgres-container-40:5432", "--", "./main"]
-
-
-
-
-# Use the official Go image as a base image
-FROM golang:latest
+# Install build dependencies
+RUN apk add --no-cache git make
 
 # Set the working directory inside the container
 WORKDIR /app
-
-# Copy wait-for-it.sh
-COPY wait-for-it.sh /wait-for-it.sh
-RUN chmod +x /wait-for-it.sh
 
 # Copy go.mod and go.sum files
 COPY go.mod go.sum ./
@@ -58,18 +17,42 @@ RUN go mod download
 # Install grpcui using Go
 RUN GO111MODULE=on go install github.com/fullstorydev/grpcui/cmd/grpcui@latest
 
-# Verify grpcui installation
-RUN which grpcui
-RUN grpcui --version
-
 # Copy the entire project
 COPY . .
 
 # Build the Go application
-RUN go build -o main ./cmd/oms-api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/oms-api/main.go
 
-# Expose port 8089 for gRPC and 8080 for other services
+# Stage 2: Runtime stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests and netcat for healthcheck
+RUN apk --no-cache add ca-certificates netcat-openbsd
+
+# Create a non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+WORKDIR /app
+
+# Copy the binary from builder
+COPY --from=builder /app/main .
+
+# Copy grpcui binary from builder
+COPY --from=builder /go/bin/grpcui /usr/local/bin/grpcui
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose ports: 8089 for gRPC, 8080 for grpcui
 EXPOSE 8089 8080
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD nc -z localhost 8089 || exit 1
+
 # Command to run the application
-CMD ["/wait-for-it.sh", "postgres-container-40:5432", "--", "./main"]
+CMD ["./main"]

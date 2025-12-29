@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/keyurKalariya/OMS/cmd/oms-api/handlers"
 	"github.com/keyurKalariya/OMS/cmd/oms-api/models"
@@ -16,12 +18,35 @@ import (
 )
 
 func initDB() (*gorm.DB, error) {
-	connStr := "host=localhost user=root password=root dbname=oms sslmode=disable"
-	// connStr := "host=postgres-container-40 user=root password=root dbname=oms sslmode=disable"
+	// Get database configuration from environment variables, with defaults for local development
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5433")
+	dbUser := getEnv("DB_USER", "postgres")
+	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbName := getEnv("DB_NAME", "oms")
 
-	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPassword, dbName)
+
+	// Retry database connection (useful in Docker when DB might not be ready immediately)
+	maxRetries := 30
+	retryDelay := 2 * time.Second
+	var db *gorm.DB
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		db, err = gorm.Open(postgres.Open(connStr), &gorm.Config{})
+		if err == nil {
+			break
+		}
+		if i < maxRetries-1 {
+			log.Printf("Failed to connect to database (attempt %d/%d): %v. Retrying in %v...", i+1, maxRetries, err, retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database after %d attempts: %v", maxRetries, err)
 	}
 
 	sqlDB, err := db.DB()
@@ -50,6 +75,13 @@ func initDB() (*gorm.DB, error) {
 	return db, nil
 }
 
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func main() {
 	// Initialize the database
 	db, err := initDB()
@@ -62,7 +94,7 @@ func main() {
 	log.Print("<==================== Starting OMS ====================>")
 	log.Print("<=========================================================>")
 
-	grpcPort := ":8089"
+	grpcPort := ":" + getEnv("GRPC_PORT", "8089")
 	lis, err := net.Listen("tcp", grpcPort)
 	if err != nil {
 		log.Fatalf("Failed to create listener: %s", err)
@@ -92,22 +124,28 @@ func main() {
 		}
 	}()
 
-	// Start grpcui in a goroutine
-	go func() {
-		// log.Println("Starting grpcui on http://localhost:8080")
-		grpcuiCmd := exec.Command("grpcui", "-plaintext", "localhost"+grpcPort)
-		grpcuiCmd.Stdout = os.Stdout
-		grpcuiCmd.Stderr = os.Stderr
+	// Start grpcui in a goroutine (optional, can be disabled via environment variable)
+	if getEnv("ENABLE_GRPCUI", "true") == "true" {
+		go func() {
+			grpcuiPort := getEnv("GRPCUI_PORT", "8080")
+			grpcHost := getEnv("GRPC_HOST", "localhost")
+			// Bind to 0.0.0.0 to make it accessible from outside the container
+			log.Printf("Starting grpcui on http://0.0.0.0:%s", grpcuiPort)
+			grpcuiCmd := exec.Command("grpcui", "-plaintext", "-bind", "0.0.0.0", "-port", grpcuiPort, grpcHost+grpcPort)
+			grpcuiCmd.Stdout = os.Stdout
+			grpcuiCmd.Stderr = os.Stderr
 
-		if err := grpcuiCmd.Start(); err != nil {
-			log.Fatalf("Failed to start grpcui: %v", err)
-		}
+			if err := grpcuiCmd.Start(); err != nil {
+				log.Printf("Failed to start grpcui: %v (continuing without grpcui)", err)
+				return
+			}
 
-		// Wait for grpcui to finish
-		if err := grpcuiCmd.Wait(); err != nil {
-			log.Printf("grpcui process exited: %v", err)
-		}
-	}()
+			// Wait for grpcui to finish
+			if err := grpcuiCmd.Wait(); err != nil {
+				log.Printf("grpcui process exited: %v", err)
+			}
+		}()
+	}
 
 	// Block the main function so that the program doesn't exit
 	select {}
